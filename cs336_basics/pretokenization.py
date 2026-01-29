@@ -3,7 +3,6 @@ from typing import BinaryIO
 from multiprocessing import Pool
 import regex as re
 from collections import Counter
-from sortedcontainers import SortedList
 from functools import partial
 
 
