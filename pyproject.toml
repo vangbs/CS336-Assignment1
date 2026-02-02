@@ -20,6 +20,8 @@ dependencies = [
     "wandb>=0.19.7",
     "ty>=0.0.1a16",
     "sortedcontainers>=2.4.0",
+    "llist>=0.7.1",
+    "mypy>=1.19.1",
 ]
 
 [build-system]

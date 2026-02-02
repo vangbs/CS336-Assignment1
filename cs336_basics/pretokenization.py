@@ -100,7 +100,7 @@ def pretokenization(
     filename: str,
     num_processes: int,
     special_tokens: list[str],
-):
+) -> Counter[bytes]:
     split_special_token = special_tokens[0]
     chunks = chunk_file(filename, num_processes, split_special_token)
     func = partial(pretokenize_chunk, special_tokens=special_tokens)
@@ -109,6 +109,7 @@ def pretokenization(
         results = pool.map(func, chunks)
     return merge_counters(results)
     
+# For test
 if __name__ == "__main__":
     pretoken_count = pretokenization(
         filename="data/TinyStories-sample.txt",
