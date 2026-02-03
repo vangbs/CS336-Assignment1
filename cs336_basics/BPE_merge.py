@@ -124,18 +124,20 @@ def BPE_merge(
     return (dict(enumerate(vocab)), merges)
 
 
-# For test
+# Usage
 if __name__ == "__main__":
     from pretokenization import pretokenization
     special_tokens = ["<|endoftext|>"]
     pretoken_count = pretokenization(
-        filename="data/TinyStories-sample.txt",
-        #filename="tests/fixtures/corpus.en",
-        num_processes=8,
+        filename="data/owt_train.txt",
+        num_processes=14,
         special_tokens=special_tokens,
     )
     (vocab, merges) = BPE_merge(
         pretoken_count,
-        vocab_size=258,
+        vocab_size=32000,
         special_tokens=special_tokens
     )
+    import pickle
+    with open("data/BPE_result/owt_train.pkl", "wb") as f:
+        pickle.dump({"vocab": vocab, "merges": merges}, f)
