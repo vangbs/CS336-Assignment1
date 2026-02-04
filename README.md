@@ -49,4 +49,10 @@ cd ..
 ```
 
 ### Virtual machine setup
+
+``` sh
 sudo apt update
+sudo apt install build-essential screen git
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv sync --python 3.13
+```

@@ -140,7 +140,7 @@ if __name__ == "__main__":
     )
     (vocab, merges) = BPE_merge(
         pretoken_count,
-        vocab_size=10000,
+        vocab_size=32000,
         special_tokens=special_tokens
     )
     import pickle
