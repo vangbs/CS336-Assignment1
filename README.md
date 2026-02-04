@@ -48,3 +48,5 @@ gunzip owt_valid.txt.gz
 cd ..
 ```
 
+### Virtual machine setup
+sudo apt update
