@@ -23,6 +23,7 @@ dependencies = [
     "llist>=0.7.1",
     "mypy>=1.19.1",
     "scalene>=2.1.3",
+    "pympler>=1.1",
 ]
 
 [build-system]

@@ -133,11 +133,17 @@ if __name__ == "__main__":
         num_processes=14,
         special_tokens=special_tokens,
     )
+    print(
+        "Pretokens and sum of their lengths:",
+        len(pretoken_count),
+        sum(len(token) for token in pretoken_count.keys())
+    )
     (vocab, merges) = BPE_merge(
         pretoken_count,
-        vocab_size=32000,
+        vocab_size=10000,
         special_tokens=special_tokens
     )
     import pickle
-    with open("data/BPE_result/owt_train.pkl", "wb") as f:
+    with open("data/BPE_result/TinyStoriesV2-GPT4-train.pkl", "wb") as f:
         pickle.dump({"vocab": vocab, "merges": merges}, f)
+    

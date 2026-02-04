@@ -59,35 +59,33 @@ def find_chunk_boundaries(
     # Make sure all boundaries are unique, but might be fewer than desired_num_chunks
     return sorted(set(chunk_boundaries))
 
-def chunk_file(
-    filename: str,
-    num_processes: int,
-    split_special_token: str,
-) -> list[str]:
-    chunks = []
-    with open(filename, "rb") as f:
-        boundaries = find_chunk_boundaries(f, num_processes, split_special_token.encode("utf-8"))
-        for start, end in zip(boundaries[:-1], boundaries[1:]):
-            f.seek(start)
-            chunk = f.read(end - start).decode("utf-8", errors="ignore")
-            chunks.append(chunk)
-    return chunks
 
 def pretokenize_chunk(
-    chunk: str,
+    chunk: tuple[int, int],
+    filename: str,
     special_tokens: list[str],
 ) -> Counter[bytes]:
-    # Split the chunk into parts to avoid special tokens
-    pattern = "|".join(re.escape(t) for t in special_tokens)
-    parts = re.split(pattern, chunk)
+    with open(filename, "rb") as f:
+        f.seek(chunk[0])
+        chunk_str = f.read(chunk[1] - chunk[0]).decode("utf-8", errors="ignore")
     
-    pattern = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
-
+    special_pattern = "|".join(re.escape(t) for t in special_tokens)
+    pretoken_pattern = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
     pretoken_count = Counter()
-    for part in parts:
-        for a in re.finditer(pattern, part):
-            pretoken_count[a.group().encode("utf-8")] += 1
+    last_end = 0
     
+    for m in re.finditer(special_pattern, chunk_str):
+        text_block = chunk_str[last_end : m.start()]
+        if text_block:
+            for a in re.finditer(pretoken_pattern, text_block):
+                pretoken_count[a.group().encode("utf-8")] += 1
+        last_end = m.end()
+
+    final_block = chunk_str[last_end:]
+    if final_block:
+        for a in re.finditer(pretoken_pattern, final_block):
+            pretoken_count[a.group().encode("utf-8")] += 1
+
     return pretoken_count
 
 def merge_counters(counters: list[Counter[bytes]]) -> Counter[bytes]:
@@ -102,8 +100,10 @@ def pretokenization(
     special_tokens: list[str],
 ) -> Counter[bytes]:
     split_special_token = special_tokens[0]
-    chunks = chunk_file(filename, num_processes, split_special_token)
-    func = partial(pretokenize_chunk, special_tokens=special_tokens)
+    with open(filename, "rb") as f:
+        boundaries = find_chunk_boundaries(f, num_processes, split_special_token.encode("utf-8"))
+    chunks = list(zip(boundaries[:-1], boundaries[1:]))
+    func = partial(pretokenize_chunk, filename=filename, special_tokens=special_tokens)
 
     with Pool(min(num_processes, len(chunks))) as pool:
         results = pool.map(func, chunks)
