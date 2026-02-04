@@ -144,6 +144,6 @@ if __name__ == "__main__":
         special_tokens=special_tokens
     )
     import pickle
-    with open("data/BPE_result/TinyStoriesV2-GPT4-train.pkl", "wb") as f:
+    with open("data/BPE_result/owt_train.pkl", "wb") as f:
         pickle.dump({"vocab": vocab, "merges": merges}, f)
     
