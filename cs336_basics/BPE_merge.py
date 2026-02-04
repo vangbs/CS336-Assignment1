@@ -68,6 +68,8 @@ def BPE_merge(
         (count, pair) for pair, count in byte_pair_count.items()
     )
     while len(vocab) < vocab_size and pq:
+        if len(vocab) % 100 == 0:
+            print(f"current vocab size: {len(vocab)}")
         # Merge byte pair which appears most frequently
         count, best_pair = pq.pop(-1)
         if count == 0:
