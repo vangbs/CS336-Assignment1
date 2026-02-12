@@ -2,6 +2,7 @@ import os
 import pickle
 from typing import Iterable, Iterator
 import regex as re
+import numpy as np
 
 class BPE_tokenizer:
     def __init__(
@@ -19,7 +20,7 @@ class BPE_tokenizer:
     @classmethod
     def from_files(
         cls, 
-        vocab_merges_filepath: str | os.PathLike, 
+        vocab_merges_filepath: str | os.PathLike,
         special_tokens: list[str]
     ):
         with open(vocab_merges_filepath, "rb") as f:
@@ -85,10 +86,29 @@ class BPE_tokenizer:
         b = b''.join(self.vocab[id] for id in ids)
         return b.decode("utf-8", errors="replace")
 
+def tokenize_file(
+    filename,
+    vocab_merges_filepath: str | os.PathLike,
+    special_tokens: list[str]
+):
+    from time import time
+    start_time = time()
+    tokenizer = BPE_tokenizer.from_files(vocab_merges_filepath, special_tokens)
+    with open(f'data/{filename}.txt','r') as inp, open(f'data/tokenized_file/{filename}.npy','wb') as outp:
+        token_array = np.fromiter(
+            tokenizer.encode_iterable(inp),
+            dtype=np.uint16
+        )
+        np.save(outp, token_array)
+    end_time = time()
+    print(f"Time taken for {filename}: {end_time - start_time} seconds")
+
 # Test
 if __name__ == "__main__":
     special_tokens = ["<|endoftext|>"]
-    tokenizer = BPE_tokenizer.from_files("data/BPE_result/owt_train.pkl", special_tokens)
-    with open('data/TinyStories-sample.txt','r') as f:
-        ids = list(tokenizer.encode_iterable(f))
-        print(tokenizer.decode(ids))
+    tiny_vocab_path = 'data/BPE_result/TinyStoriesV2-GPT4-train.pkl'
+    owt_vocab_path = 'data/BPE_result/owt_train.pkl'
+    tokenize_file('TinyStoriesV2-GPT4-valid',tiny_vocab_path,special_tokens)
+    tokenize_file('TinyStoriesV2-GPT4-train',tiny_vocab_path,special_tokens)
+    tokenize_file('owt_valid',owt_vocab_path,special_tokens)
+    tokenize_file('owt_train',owt_vocab_path,special_tokens)

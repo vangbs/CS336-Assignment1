@@ -23,6 +23,8 @@ dependencies = [
     "llist>=0.7.1",
     "mypy>=1.19.1",
     "pympler>=1.1",
+    "typeguard>=4.4.4",
+    "beartype>=0.22.9",
 ]
 
 [build-system]
