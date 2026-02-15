@@ -120,30 +120,26 @@ class MySwiGLU(torch.nn.Module):
     def __init__(
         self,
         d_model: int,
+        d_ff: int | None = None,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None
     ):
         super().__init__()
         self.d_model = d_model
-        self.d_ff = round(8 / 3 * d_model / 64) * 64
+        if d_ff is None:
+            d_ff = round(8 / 3 * d_model / 64) * 64
+        self.d_ff = d_ff
         self.w1 = MyLinear(self.d_model, self.d_ff, device=device, dtype=dtype)
         self.w2 = MyLinear(self.d_ff, self.d_model, device=device, dtype=dtype)
         self.w3 = MyLinear(self.d_model, self.d_ff, device=device, dtype=dtype)
     
     @jaxtyped(typechecker=beartype)
-    def init_force_(
+    def init_with_weights(
         self,
-        d_ff: int,
         w1: Float[torch.Tensor, "d_ff d_model"],
         w2: Float[torch.Tensor, "d_model d_ff"],
         w3: Float[torch.Tensor, "d_ff d_model"],
     ):
-        self.d_ff = d_ff
-        assert w1.shape == (self.d_ff, self.d_model)
-        self.w1 = MyLinear(self.d_model, self.d_ff, device=self.w1.weight.device, dtype=self.w1.weight.dtype)
-        self.w2 = MyLinear(self.d_ff, self.d_model, device=self.w2.weight.device, dtype=self.w2.weight.dtype)
-        self.w3 = MyLinear(self.d_model, self.d_ff, device=self.w3.weight.device, dtype=self.w3.weight.dtype)
-        
         with torch.no_grad():
             self.w1.weight.copy_(w1)
             self.w2.weight.copy_(w2)
@@ -154,10 +150,10 @@ class MySwiGLU(torch.nn.Module):
         self,
         x: Float[torch.Tensor, "... d_model"],
     ) -> Float[torch.Tensor, "... d_model"]:
-        w1x = self.w1.forward(x)
+        w1x = self.w1(x)
         silu = einsum(w1x, torch.sigmoid(w1x), "... d_ff, ... d_ff -> ... d_ff")
-        w3x = self.w3.forward(x) 
-        return self.w2.forward(einsum(silu, w3x, "... d_ff, ... d_ff -> ... d_ff"))
+        w3x = self.w3(x) 
+        return self.w2(einsum(silu, w3x, "... d_ff, ... d_ff -> ... d_ff"))
 
 class MyRoPE(torch.nn.Module):
     def __init__(
@@ -232,6 +228,129 @@ def My_Scaled_dot_product_attention(
     if mask is not None:
         pre_softmax = pre_softmax.masked_fill(~mask, float("-inf"))
     return einsum(MySoftmax(pre_softmax, dim=-1), V, "... queries keys, ... keys d_v -> ... queries d_v")
+
+class My_multihead_self_attention(torch.nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        max_seq_len: int | None = None,
+        theta: float | None = None,
+        device: torch.device | None = None,
+        dtype: torch.dtype | None = None
+    ):
+        super().__init__()
+        assert d_model % num_heads == 0
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.d_k = self.d_v = d_model // num_heads
+        self.w_qkv = MyLinear(d_model, num_heads * (self.d_k + self.d_k + self.d_v), device=device, dtype=dtype)
+        self.w_o = MyLinear(num_heads * self.d_v, d_model, device=device, dtype=dtype)
+        if theta is not None:
+            self.rope = MyRoPE(theta, self.d_k, max_seq_len, device=device)
+    
+    @jaxtyped(typechecker=beartype)
+    def init_with_weights(
+        self,
+        q_weight: Float[torch.Tensor, " h_d_k d_model"],
+        k_weight: Float[torch.Tensor, " h_d_k d_model"],
+        v_weight: Float[torch.Tensor, " h_d_v d_model"],
+        o_weight: Float[torch.Tensor, " d_model h_d_v"],
+    ):
+        assert q_weight.shape[-2] == self.d_k * self.num_heads
+        assert k_weight.shape[-2] == self.d_k * self.num_heads
+        assert v_weight.shape[-2] == self.d_v * self.num_heads
+        
+        with torch.no_grad():
+            self.w_qkv.weight.copy_(torch.cat([q_weight, k_weight, v_weight], dim=-2))
+            self.w_o.weight.copy_(o_weight)
+    
+    @jaxtyped(typechecker=beartype)
+    def forward(
+        self,
+        x: Float[torch.Tensor, "... sequence_length d_model"],
+        token_positions: Int[torch.Tensor, " ... sequence_length"] | None = None,
+    ) -> Float[torch.Tensor, "... sequence_length d_model"]:
+        Q, K, V = torch.split(
+            self.w_qkv(x),
+            [self.d_k * self.num_heads, self.d_k * self.num_heads, self.d_v * self.num_heads],
+            dim=-1,
+        )
+        # d_x stands for d_k or d_v
+        pat = "... (h d_x) -> h ... d_x"
+        Q = rearrange(Q, pat, h=self.num_heads)
+        K = rearrange(K, pat, h=self.num_heads)
+        V = rearrange(V, pat, h=self.num_heads)
+        seq_len = x.shape[-2]
+        if hasattr(self, "rope"):
+            if token_positions is None:
+                pos = torch.arange(seq_len, device=x.device)
+                token_positions = pos.expand(*x.shape[:-1])
+            Q = self.rope(Q, token_positions)
+            K = self.rope(K, token_positions)
+        mask = torch.tril(torch.ones(seq_len, seq_len, device=x.device)).bool()
+        return self.w_o(rearrange(My_Scaled_dot_product_attention(Q, K, V, mask), "h ... d_v -> ... (h d_v)"))
+
+class MyTransformerBlock(torch.nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        d_ff: int,
+        max_seq_len: int,
+        theta: float,
+        device: torch.device | None = None,
+    ):
+        super().__init__()
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.d_ff = d_ff
+        self.max_seq_len = max_seq_len
+        self.theta = theta
+        self.ln1 = MyRMSNorm(d_model, device=device)
+        self.attn = My_multihead_self_attention(d_model, num_heads, max_seq_len, theta, device=device)
+        self.ln2 = MyRMSNorm(d_model, device=device)
+        self.ffn = MySwiGLU(d_model, d_ff, device=device)
+    
+    
+    @jaxtyped(typechecker=beartype)
+    def forward(
+        self,
+        x: Float[torch.Tensor, "... sequence_length d_model"],
+    ) -> Float[torch.Tensor, "... sequence_length d_model"]:
+        y = x + self.attn(self.ln1(x))
+        return y + self.ffn(self.ln2(y))
+
+class MyTransformerLM(torch.nn.Module):
+    def __init__(
+        self,
+        vocab_size: int,
+        context_length: int,
+        d_model: int,
+        num_layers: int,
+        num_heads: int,
+        d_ff: int,
+        rope_theta: float,
+        device: torch.device | None = None,
+    ):
+        super().__init__()
+        self.token_embeddings = MyEmbedding(vocab_size, d_model, device=device)
+        self.layers = torch.nn.ModuleList(
+            MyTransformerBlock(d_model, num_heads, d_ff, context_length, rope_theta, device=device) for _ in range(num_layers)
+        )
+        self.ln_final = MyRMSNorm(d_model, device=device)
+        self.lm_head = MyLinear(d_model, vocab_size, device=device)
+    
+    @jaxtyped(typechecker=beartype)
+    def forward(
+        self,
+        in_indices: Int[torch.Tensor, " batch_size sequence_length"],
+    ) -> Float[torch.Tensor, " batch_size sequence_length vocab_size"]:
+        x = self.token_embeddings(in_indices)
+        for layer in self.layers:
+            x = layer(x)
+        x = self.ln_final(x)
+        return self.lm_head(x)
 
 # Test
 if __name__ == "__main__":

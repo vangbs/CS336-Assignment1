@@ -32,7 +32,7 @@ def run_linear(
 
     model = MyModule.MyLinear(d_in, d_out)
     model.init_with_weights(weights)
-    return model.forward(in_features)
+    return model(in_features)
 
 
 def run_embedding(
@@ -55,7 +55,7 @@ def run_embedding(
     """
     model = MyModule.MyEmbedding(vocab_size, d_model)
     model.init_with_weights(weights)
-    return model.forward(token_ids)
+    return model(token_ids)
 
 
 def run_swiglu(
@@ -87,9 +87,9 @@ def run_swiglu(
     # swiglu.w1.weight.data = w1_weight
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
-    model = MyModule.MySwiGLU(d_model)
-    model.init_force_(d_ff, w1_weight, w2_weight, w3_weight)
-    return model.forward(in_features)
+    model = MyModule.MySwiGLU(d_model, d_ff)
+    model.init_with_weights(w1_weight, w2_weight, w3_weight)
+    return model(in_features)
 
 def run_scaled_dot_product_attention(
     Q: Float[Tensor, " ... queries d_k"],
@@ -143,7 +143,9 @@ def run_multihead_self_attention(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    model = MyModule.My_multihead_self_attention(d_model, num_heads)
+    model.init_with_weights(q_proj_weight, k_proj_weight, v_proj_weight, o_proj_weight)
+    return model(in_features)
 
 
 def run_multihead_self_attention_with_rope(
@@ -183,7 +185,9 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    model = MyModule.My_multihead_self_attention(d_model, num_heads, max_seq_len, theta)
+    model.init_with_weights(q_proj_weight, k_proj_weight, v_proj_weight, o_proj_weight)
+    return model(in_features, token_positions)
 
 
 def run_rope(
@@ -206,7 +210,7 @@ def run_rope(
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
     model = MyModule.MyRoPE(theta, d_k, max_seq_len)
-    return model.forward(in_query_or_key, token_positions)
+    return model(in_query_or_key, token_positions)
 
 
 def run_transformer_block(
@@ -279,7 +283,24 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    raise NotImplementedError
+    model = MyModule.MyTransformerBlock(d_model, num_heads, d_ff, max_seq_len, theta)
+    weights['attn.w_qkv.weight'] = torch.cat(
+        [
+            weights['attn.q_proj.weight'],
+            weights['attn.k_proj.weight'],
+            weights['attn.v_proj.weight'],
+        ],
+        dim=-2,
+    )
+    weights['attn.w_o.weight'] = weights['attn.output_proj.weight']
+    
+    weights.pop('attn.q_proj.weight')
+    weights.pop('attn.k_proj.weight')
+    weights.pop('attn.v_proj.weight')
+    weights.pop('attn.output_proj.weight')
+    
+    model.load_state_dict(weights)
+    return model(in_features)
 
 
 def run_transformer_lm(
@@ -361,7 +382,25 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    model = MyModule.MyTransformerLM(vocab_size, context_length, d_model, num_layers, num_heads, d_ff, rope_theta)
+    for i in range(num_layers):
+        weights[f'layers.{i}.attn.w_qkv.weight'] = torch.cat(
+            [
+                weights[f'layers.{i}.attn.q_proj.weight'],
+                weights[f'layers.{i}.attn.k_proj.weight'],
+                weights[f'layers.{i}.attn.v_proj.weight'],
+            ],
+            dim=-2,
+        )
+        weights[f'layers.{i}.attn.w_o.weight'] = weights[f'layers.{i}.attn.output_proj.weight']
+        
+        weights.pop(f'layers.{i}.attn.q_proj.weight')
+        weights.pop(f'layers.{i}.attn.k_proj.weight')
+        weights.pop(f'layers.{i}.attn.v_proj.weight')
+        weights.pop(f'layers.{i}.attn.output_proj.weight')
+
+    model.load_state_dict(weights)
+    return model(in_indices)
 
 
 def run_rmsnorm(
@@ -386,7 +425,7 @@ def run_rmsnorm(
     """
     model = MyModule.MyRMSNorm(d_model, eps)
     model.init_with_weights(weights)
-    return model.forward(in_features)
+    return model(in_features)
 
 
 def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
