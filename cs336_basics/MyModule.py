@@ -354,5 +354,14 @@ class MyTransformerLM(torch.nn.Module):
 
 # Test
 if __name__ == "__main__":
-    model = MyRoPE(10000, 64, 6324)
-    print(model.cos_cached.shape, model.sin_cached.shape)
+    model = MyTransformerLM(
+        vocab_size=50257,
+        context_length=1024,
+        d_model=1600,
+        num_layers=48,
+        num_heads=25,
+        d_ff=6400,
+        rope_theta=10000.0,
+    )
+    from torchinfo import summary
+    summary(model, input_size=(1, 1024), dtypes=[torch.long])

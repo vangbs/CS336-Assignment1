@@ -25,6 +25,7 @@ dependencies = [
     "pympler>=1.1",
     "typeguard>=4.4.4",
     "beartype>=0.22.9",
+    "torchinfo>=1.8.0",
 ]
 
 [build-system]
