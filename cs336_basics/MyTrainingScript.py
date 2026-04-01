@@ -57,6 +57,7 @@ def main(
                 valid_loss = MyLoss.My_cross_entropy(valid_outputs, valid_targets)
                 print(f'Validation Loss: {valid_loss.cpu().item()}')
             model.train()
+            MyData.save_checkpoint(model, optimizer, t, f'checkpoint/{set_name}-{t}.pt')
         
 if __name__ == "__main__":
     typer.run(main)
