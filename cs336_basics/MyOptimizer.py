@@ -6,11 +6,14 @@ class MyAdamW(torch.optim.Optimizer):
     def __init__(
         self,
         params,
-        **kwargs
+        lr: float,
+        weight_decay: float,
+        betas: tuple[float, float],
+        eps: float
     ):
-        if kwargs.get("lr", -1) < 0:
+        if lr < 0:
             raise ValueError("Invalid learning rate")
-        super().__init__(params, defaults=kwargs)
+        super().__init__(params, defaults={"lr": lr, "weight_decay": weight_decay, "betas": betas, "eps": eps})
     
     @torch.no_grad()
     def step(

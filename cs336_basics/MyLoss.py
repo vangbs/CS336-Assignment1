@@ -36,4 +36,4 @@ if __name__ == "__main__":
         ]
     )
     targets = torch.tensor([[1, 0, 2, 2], [4, 1, 4, 0]])
-    print(My_cross_entropy(inputs, targets).shape)
+    print(My_cross_entropy(inputs, targets))
