@@ -94,6 +94,8 @@ def tokenize_file(
     from time import time
     start_time = time()
     tokenizer = BPE_tokenizer.from_files(vocab_merges_filepath, special_tokens)
+    print(len(tokenizer.vocab))
+    '''
     with open(f'data/{filename}.txt','r') as inp, open(f'data/tokenized_file/{filename}.npy','wb') as outp:
         token_array = np.fromiter(
             tokenizer.encode_iterable(inp),
@@ -102,6 +104,7 @@ def tokenize_file(
         np.save(outp, token_array)
     end_time = time()
     print(f"Time taken for {filename}: {end_time - start_time} seconds")
+    '''
 
 # Test
 if __name__ == "__main__":
@@ -109,6 +112,6 @@ if __name__ == "__main__":
     tiny_vocab_path = 'data/BPE_result/TinyStoriesV2-GPT4-train.pkl'
     owt_vocab_path = 'data/BPE_result/owt_train.pkl'
     tokenize_file('TinyStoriesV2-GPT4-valid',tiny_vocab_path,special_tokens)
-    tokenize_file('TinyStoriesV2-GPT4-train',tiny_vocab_path,special_tokens)
-    tokenize_file('owt_valid',owt_vocab_path,special_tokens)
-    tokenize_file('owt_train',owt_vocab_path,special_tokens)
+    #tokenize_file('TinyStoriesV2-GPT4-train',tiny_vocab_path,special_tokens)
+    #tokenize_file('owt_valid',owt_vocab_path,special_tokens)
+    #tokenize_file('owt_train',owt_vocab_path,special_tokens)

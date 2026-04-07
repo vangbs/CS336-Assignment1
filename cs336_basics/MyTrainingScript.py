@@ -3,61 +3,56 @@ import MyModule
 import MyLoss
 import MyOptimizer
 import MyData
-import typer
 import numpy as np
+from config import ModelConfig, OptimizerConfig, TrainingConfig
+import time
 
-def main(
-    num_iters: int = 100,
-    batch_size: int = 128,
-    device: str = 'cpu',
-    vocab_size: int = 32000,
-    context_length: int = 1024,
-    d_model: int = 1600,
-    num_layers: int = 48,
-    num_heads: int = 25,
-    d_ff: int = 6400,
-    rope_theta: float = 10000.0,
-    lr: float = 1e-3,
-    weight_decay: float = 0.01,
-    betas: tuple[float, float] = (0.9, 0.999),
-    eps: float = 1e-8
-):
+def main():
+    model_config = ModelConfig()
+    optimizer_config = OptimizerConfig()
+    training_config = TrainingConfig()
     model = MyModule.MyTransformerLM(
-        vocab_size=vocab_size,
-        context_length=context_length,
-        d_model=d_model,
-        num_layers=num_layers,
-        num_heads=num_heads,
-        d_ff=d_ff,
-        rope_theta=rope_theta,
+        vocab_size=model_config.vocab_size,
+        context_length=model_config.context_length,
+        d_model=model_config.d_model,
+        num_layers=model_config.num_layers,
+        num_heads=model_config.num_heads,
+        d_ff=model_config.d_ff,
+        rope_theta=model_config.rope_theta,
+        device=training_config.device,
+        dtype=training_config.dtype
     )
     optimizer = MyOptimizer.My_AdamW(
         model.parameters(),
-        lr=lr,
-        weight_decay=weight_decay,
-        betas=betas,
-        eps=eps,
+        max_learning_rate=optimizer_config.max_learning_rate,
+        min_learning_rate=optimizer_config.min_learning_rate,
+        warmup_iters=optimizer_config.warmup_iters,
+        cosine_cycle_iters=optimizer_config.cosine_cycle_iters,
+        weight_decay=optimizer_config.weight_decay,
+        betas=optimizer_config.betas,
+        eps=optimizer_config.eps,
     )
-    set_name = 'TinyStoriesV2-GPT4'
-    train_set = np.load(f'data/tokenized_file/{set_name}-train.npy', mmap_mode='r')
-    valid_set = np.load(f'data/tokenized_file/{set_name}-valid.npy', mmap_mode='r')
-    for t in range(num_iters):
+    train_set = np.load(f'data/tokenized_file/{training_config.set_name}-train.npy', mmap_mode='r')
+    valid_set = np.load(f'data/tokenized_file/{training_config.set_name}-valid.npy', mmap_mode='r')
+    start_time = time.time()
+    for t in range(1, training_config.num_iters + 1):
         optimizer.zero_grad()
-        train_inputs, train_targets = MyData.run_get_batch(train_set, batch_size, context_length, device)
+        train_inputs, train_targets = MyData.run_get_batch(train_set, training_config.batch_size, model_config.context_length, training_config.device)
         train_outputs = model(train_inputs)
         loss = MyLoss.My_cross_entropy(train_outputs, train_targets)
         loss.backward()
+        MyOptimizer.gradient_clipping_(model.parameters(), training_config.max_grad_norm)
         optimizer.step()
-        print(f'Iteration {t}, Loss: {loss.cpu().item()}')
-        if t % 10 == 0:
+        print(f'Iteration {t}, Loss: {loss.cpu().item()}, time: {(time.time() - start_time) / 60} minutes')
+        if t % 500 == 0:
             model.eval()
             with torch.no_grad():
-                valid_inputs, valid_targets = MyData.run_get_batch(valid_set, batch_size, context_length, device)
+                valid_inputs, valid_targets = MyData.run_get_batch(valid_set, training_config.batch_size, model_config.context_length, training_config.device)
                 valid_outputs = model(valid_inputs)
                 valid_loss = MyLoss.My_cross_entropy(valid_outputs, valid_targets)
                 print(f'Validation Loss: {valid_loss.cpu().item()}')
             model.train()
-            MyData.save_checkpoint(model, optimizer, t, f'checkpoint/{set_name}-{t}.pt')
+            MyData.save_checkpoint(model, optimizer, t, f'checkpoints/{training_config.set_name}-{t}.pt')
         
 if __name__ == "__main__":
-    typer.run(main)
+    main()

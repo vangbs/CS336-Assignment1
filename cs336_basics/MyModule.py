@@ -213,8 +213,11 @@ def MySoftmax(
     x: Float[torch.Tensor, "..."],
     dim: int,
 ) -> Float[torch.Tensor, "..."]:
+    in_dtype = x.dtype
+    x = x.to(torch.float32)
     x_trans = torch.exp(x - torch.max(x, dim=dim, keepdim=True).values)
-    return x_trans / torch.sum(x_trans, dim=dim, keepdim=True)
+    result = x_trans / torch.sum(x_trans, dim=dim, keepdim=True)
+    return result.to(in_dtype)
 
 @jaxtyped(typechecker=beartype)
 def My_Scaled_dot_product_attention(
@@ -300,6 +303,7 @@ class MyTransformerBlock(torch.nn.Module):
         max_seq_len: int,
         theta: float,
         device: torch.device | None = None,
+        dtype: torch.dtype | None = None
     ):
         super().__init__()
         self.d_model = d_model
@@ -307,10 +311,10 @@ class MyTransformerBlock(torch.nn.Module):
         self.d_ff = d_ff
         self.max_seq_len = max_seq_len
         self.theta = theta
-        self.ln1 = MyRMSNorm(d_model, device=device)
-        self.attn = My_multihead_self_attention(d_model, num_heads, max_seq_len, theta, device=device)
-        self.ln2 = MyRMSNorm(d_model, device=device)
-        self.ffn = MySwiGLU(d_model, d_ff, device=device)
+        self.ln1 = MyRMSNorm(d_model, device=device, dtype=dtype)
+        self.attn = My_multihead_self_attention(d_model, num_heads, max_seq_len, theta, device=device, dtype=dtype)
+        self.ln2 = MyRMSNorm(d_model, device=device, dtype=dtype)
+        self.ffn = MySwiGLU(d_model, d_ff, device=device, dtype=dtype)
     
     
     @jaxtyped(typechecker=beartype)
@@ -332,14 +336,15 @@ class MyTransformerLM(torch.nn.Module):
         d_ff: int,
         rope_theta: float,
         device: torch.device | None = None,
+        dtype: torch.dtype | None = None
     ):
         super().__init__()
-        self.token_embeddings = MyEmbedding(vocab_size, d_model, device=device)
+        self.token_embeddings = MyEmbedding(vocab_size, d_model, device=device, dtype=dtype)
         self.layers = torch.nn.ModuleList(
-            MyTransformerBlock(d_model, num_heads, d_ff, context_length, rope_theta, device=device) for _ in range(num_layers)
+            MyTransformerBlock(d_model, num_heads, d_ff, context_length, rope_theta, device=device, dtype=dtype) for _ in range(num_layers)
         )
-        self.ln_final = MyRMSNorm(d_model, device=device)
-        self.lm_head = MyLinear(d_model, vocab_size, device=device)
+        self.ln_final = MyRMSNorm(d_model, device=device, dtype=dtype)
+        self.lm_head = MyLinear(d_model, vocab_size, device=device, dtype=dtype)
     
     @jaxtyped(typechecker=beartype)
     def forward(
@@ -354,6 +359,7 @@ class MyTransformerLM(torch.nn.Module):
 
 # Test
 if __name__ == "__main__":
+    device = torch.device("meta")
     model = MyTransformerLM(
         vocab_size=50257,
         context_length=1024,
@@ -362,6 +368,8 @@ if __name__ == "__main__":
         num_heads=25,
         d_ff=6400,
         rope_theta=10000.0,
-    )
+        dtype=torch.bfloat16
+    ).to(device)
     from torchinfo import summary
-    summary(model, input_size=(1, 1024), dtypes=[torch.long])
+    input_data = torch.ones((1, 1024), dtype=torch.long, device=device)
+    summary(model, input_data=input_data)
