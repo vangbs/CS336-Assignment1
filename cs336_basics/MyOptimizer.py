@@ -6,10 +6,7 @@ class MyAdamW(torch.optim.Optimizer):
     def __init__(
         self,
         params,
-        max_learning_rate: float,
-        min_learning_rate: float,
-        warmup_iters: int,
-        cosine_cycle_iters: int,
+        lr: float,
         weight_decay: float,
         betas: tuple[float, float],
         eps: float
@@ -21,7 +18,7 @@ class MyAdamW(torch.optim.Optimizer):
             {"params": nodecay_params, "weight_decay": 0.0},
         ]
         super().__init__(optim_groups, defaults={
-            "lr_scheduler": My_Cosine_Schedule(max_learning_rate, min_learning_rate, warmup_iters, cosine_cycle_iters),
+            "lr": lr,
             "weight_decay": weight_decay,
             "betas": betas,
             "eps": eps
@@ -33,7 +30,7 @@ class MyAdamW(torch.optim.Optimizer):
         _closure = None
     ):
         for group in self.param_groups:
-            lr_scheduler = group["lr_scheduler"]
+            lr = group["lr"]
             weight_decay = group["weight_decay"]
             betas = group["betas"]
             eps = group["eps"]
@@ -53,7 +50,6 @@ class MyAdamW(torch.optim.Optimizer):
                 m = betas[0] * m + (1 - betas[0]) * grad
                 v = betas[1] * v + (1 - betas[1]) * (grad ** 2)
                 t += 1
-                lr = lr_scheduler.get_learning_rate(t)
                 alpha_t = lr * math.sqrt(1 - betas[1] ** t) / (1 - betas[0] ** t)
                 
                 master_p.sub_(m / (torch.sqrt(v) + eps), alpha=alpha_t)
@@ -67,19 +63,35 @@ class MyAdamW(torch.optim.Optimizer):
 
         return None
 
-class My_Cosine_Schedule:
+class My_Cosine_Scheduler:
     def __init__(
         self,
+        optimizer: torch.optim.Optimizer,
         max_learning_rate: float,
         min_learning_rate: float,
         warmup_iters: int,
         cosine_cycle_iters: int,
     ):
+        self.optimizer = optimizer
         self.max_learning_rate = max_learning_rate
         self.min_learning_rate = min_learning_rate
         self.warmup_iters = warmup_iters
         self.cosine_cycle_iters = cosine_cycle_iters
 
+    def state_dict(self):
+        return {
+            "max_learning_rate": self.max_learning_rate,
+            "min_learning_rate": self.min_learning_rate,
+            "warmup_iters": self.warmup_iters,
+            "cosine_cycle_iters": self.cosine_cycle_iters,
+        }
+    
+    def load_state_dict(self, state_dict):
+        self.max_learning_rate = state_dict["max_learning_rate"]
+        self.min_learning_rate = state_dict["min_learning_rate"]
+        self.warmup_iters = state_dict["warmup_iters"]
+        self.cosine_cycle_iters = state_dict["cosine_cycle_iters"]
+    
     def get_learning_rate(
         self,
         it: int,
@@ -94,6 +106,12 @@ class My_Cosine_Schedule:
             ) * (
                 1 + math.cos((it - self.warmup_iters) / (self.cosine_cycle_iters - self.warmup_iters) * math.pi)
             )
+    
+    def step(self, it: int):
+        lr = self.get_learning_rate(it)
+        for param_group in self.optimizer.param_groups:
+            param_group['lr'] = lr
+        
 
 @torch.no_grad()
 def gradient_clipping_(

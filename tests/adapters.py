@@ -384,7 +384,7 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    model = MyModule.MyTransformerLM(vocab_size, context_length, d_model, num_layers, num_heads, d_ff, rope_theta)
+    model = MyModule.MyTransformerLM(vocab_size, context_length, d_model, num_layers, num_heads, d_ff, rope_theta, dtype=torch.float32)
     for i in range(num_layers):
         weights[f'layers.{i}.attn.w_qkv.weight'] = torch.cat(
             [

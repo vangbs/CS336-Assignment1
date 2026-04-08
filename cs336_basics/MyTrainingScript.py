@@ -24,13 +24,17 @@ def main():
     )
     optimizer = MyOptimizer.My_AdamW(
         model.parameters(),
+        lr=optimizer_config.lr,
+        weight_decay=optimizer_config.weight_decay,
+        betas=optimizer_config.betas,
+        eps=optimizer_config.eps,
+    )
+    scheduler = MyOptimizer.My_Cosine_Scheduler(
+        optimizer,
         max_learning_rate=optimizer_config.max_learning_rate,
         min_learning_rate=optimizer_config.min_learning_rate,
         warmup_iters=optimizer_config.warmup_iters,
         cosine_cycle_iters=optimizer_config.cosine_cycle_iters,
-        weight_decay=optimizer_config.weight_decay,
-        betas=optimizer_config.betas,
-        eps=optimizer_config.eps,
     )
     train_set = np.load(f'data/tokenized_file/{training_config.set_name}-train.npy', mmap_mode='r')
     valid_set = np.load(f'data/tokenized_file/{training_config.set_name}-valid.npy', mmap_mode='r')
@@ -42,6 +46,7 @@ def main():
         loss = MyLoss.My_cross_entropy(train_outputs, train_targets)
         loss.backward()
         MyOptimizer.gradient_clipping_(model.parameters(), training_config.max_grad_norm)
+        scheduler.step(t)
         optimizer.step()
         print(f'Iteration {t}, Loss: {loss.cpu().item()}, time: {(time.time() - start_time) / 60} minutes')
         if t % 500 == 0:

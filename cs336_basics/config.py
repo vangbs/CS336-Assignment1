@@ -13,6 +13,7 @@ class ModelConfig:
 
 @dataclass(frozen=True)
 class OptimizerConfig:
+    lr: float = 1e-4,
     max_learning_rate: float = 6e-4,
     min_learning_rate: float = 6e-5,
     warmup_iters: int = 2000,

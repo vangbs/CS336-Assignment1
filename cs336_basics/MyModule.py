@@ -370,6 +370,6 @@ if __name__ == "__main__":
         rope_theta=10000.0,
         dtype=torch.bfloat16
     ).to(device)
-    from torchinfo import summary
-    input_data = torch.ones((1, 1024), dtype=torch.long, device=device)
-    summary(model, input_data=input_data)
+    #from torchinfo import summary
+    #input_data = torch.ones((1, 1024), dtype=torch.long, device=device)
+    #summary(model, input_data=input_data)

@@ -17,7 +17,7 @@ _A = TypeVar("_A", np.ndarray, Tensor)
 
 def _canonicalize_array(arr: _A) -> np.ndarray:
     if isinstance(arr, Tensor):
-        arr = arr.detach().cpu().numpy()
+        arr = arr.detach().cpu().float().numpy()
     return arr
 
 
