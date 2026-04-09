@@ -6,6 +6,7 @@ import MyData
 import numpy as np
 from config import ModelConfig, OptimizerConfig, TrainingConfig
 import time
+from torchinfo import summary
 
 def main():
     model_config = ModelConfig()
@@ -22,6 +23,8 @@ def main():
         device=training_config.device,
         dtype=training_config.dtype
     )
+    summary(model, input_size=(1, model_config.context_length), dtypes=[torch.long])
+    '''
     optimizer = MyOptimizer.My_AdamW(
         model.parameters(),
         lr=optimizer_config.lr,
@@ -58,6 +61,7 @@ def main():
                 print(f'Validation Loss: {valid_loss.cpu().item()}')
             model.train()
             MyData.save_checkpoint(model, optimizer, t, f'checkpoints/{training_config.set_name}-{t}.pt')
+    '''
         
 if __name__ == "__main__":
     main()

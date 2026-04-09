@@ -31,11 +31,19 @@ def load_model():
         betas=optimizer_config.betas,
         eps=optimizer_config.eps,
     )
+    scheduler = MyOptimizer.My_Cosine_Scheduler(
+        optimizer,
+        max_learning_rate=optimizer_config.max_learning_rate,
+        min_learning_rate=optimizer_config.min_learning_rate,
+        warmup_iters=optimizer_config.warmup_iters,
+        cosine_cycle_iters=optimizer_config.cosine_cycle_iters,
+    )
     checkpoint_path = f'checkpoints/{training_config.set_name}-{training_config.num_iters}.pt'
     MyData.load_checkpoint(
         src=checkpoint_path,
         model=model,
         optimizer=optimizer,
+        scheduler=scheduler,
     )
     return model
 
