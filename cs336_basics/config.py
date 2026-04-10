@@ -27,7 +27,7 @@ class TrainingConfig:
     num_iters: int = 100
     batch_size: int = 128
     max_grad_norm: float = 1.0
-    device: torch.device = torch.device('cpu')
+    device: torch.device = torch.device('cuda')
     dtype: torch.dtype = torch.bfloat16
     set_name: str = 'TinyStoriesV2-GPT4'
 

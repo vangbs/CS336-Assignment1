@@ -3,7 +3,7 @@ name = "cs336_basics"
 version = "1.0.6"
 description = "CS336 Assignment 1"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "einops>=0.8.1", # tensor operations
     "einx>=0.3.0", # more general tensor operations
@@ -14,8 +14,8 @@ dependencies = [
     "regex>=2024.11.6", # more powerful regex than the builtin `re` module
     "submitit>=1.5.2", # job submission for SLURM
     "tiktoken>=0.9.0",
-    "torch~=2.6.0; sys_platform != 'darwin' or platform_machine != 'x86_64'",
-    "torch~=2.2.2; sys_platform == 'darwin' and platform_machine == 'x86_64'", # Intel Macs
+    "torch>=2.6.0; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "torch>=2.2.2,<2.3; sys_platform == 'darwin' and platform_machine == 'x86_64'",
     "tqdm>=4.67.1",
     "wandb>=0.19.7",
     "ty>=0.0.1a16",
@@ -57,4 +57,16 @@ line-length = 120
 extend-select = ["UP"]
 ignore = [
     "F722"
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true  # 只有在 sources 里明确指定时才会使用这个源
+
+[tool.uv.sources]
+# 只有在 Linux x86_64 环境下才去 cu126 找 torch
+# Mac 或其他平台会自动去默认的 PyPI 找
+torch = [
+  { index = "pytorch-cu126", marker = "sys_platform == 'linux' and platform_machine == 'x86_64'" },
 ]
