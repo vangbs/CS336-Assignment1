@@ -3,16 +3,17 @@ import MyModule
 import MyOptimizer
 from BPE_tokenizer import BPE_tokenizer
 import MyData
-import pickle
 import torch
 from config import ModelConfig, OptimizerConfig, TrainingConfig, InferenceConfig
 from jaxtyping import jaxtyped, Int
 from beartype import beartype
+from dataclasses import replace
 
-def load_model():
-    model_config = ModelConfig()
-    optimizer_config = OptimizerConfig()
-    training_config = TrainingConfig()
+def load_model(
+    model_config: ModelConfig,
+    optimizer_config: OptimizerConfig,
+    training_config: TrainingConfig,
+):
     model = MyModule.MyTransformerLM(
         vocab_size=model_config.vocab_size,
         context_length=model_config.context_length,
@@ -24,33 +25,27 @@ def load_model():
         device=training_config.device,
         dtype=training_config.dtype
     )
-    optimizer = MyOptimizer.My_AdamW(
+    optimizer = MyOptimizer.MyAdamW(
         model.parameters(),
         lr=optimizer_config.lr,
         weight_decay=optimizer_config.weight_decay,
         betas=optimizer_config.betas,
         eps=optimizer_config.eps,
     )
-    scheduler = MyOptimizer.My_Cosine_Scheduler(
-        optimizer,
-        max_learning_rate=optimizer_config.max_learning_rate,
-        min_learning_rate=optimizer_config.min_learning_rate,
-        warmup_iters=optimizer_config.warmup_iters,
-        cosine_cycle_iters=optimizer_config.cosine_cycle_iters,
-    )
-    checkpoint_path = f'checkpoints/{training_config.set_name}-{training_config.num_iters}.pt'
+    valid_loss = 1.320312
+    checkpoint_path = f'checkpoints/{training_config.set_name}-{training_config.batch_size}-{optimizer_config.max_learning_rate:.6f}-{valid_loss:.6f}.pt'
     MyData.load_checkpoint(
         src=checkpoint_path,
         model=model,
         optimizer=optimizer,
-        scheduler=scheduler,
     )
     return model
 
 @jaxtyped(typechecker=beartype)
-def load_prompt(tokenizer: BPE_tokenizer) -> Int[torch.Tensor, " batch_size sequence_length"]:
-    training_config = TrainingConfig()
-    
+def load_prompt(
+    tokenizer: BPE_tokenizer,
+    training_config: TrainingConfig,
+) -> Int[torch.Tensor, " batch_size sequence_length"]:
     with open(f'data/prompts/prompt.txt', 'r') as inp:
         prompt_encoded = np.fromiter(
             tokenizer.encode_iterable(inp),
@@ -77,11 +72,20 @@ if __name__ == "__main__":
     inference_config = InferenceConfig()
     vocab_path = f'data/BPE_result/{training_config.set_name}-train.pkl'
     tokenizer = BPE_tokenizer.from_files(vocab_path, ["<|endoftext|>"])
-    
-    model = load_model()
+    model_config = ModelConfig()
+    optimizer_config = OptimizerConfig()
+    training_config = replace(
+        training_config,
+        batch_size = 32
+    )
+    optimizer_config = replace(
+        optimizer_config,
+        max_learning_rate = 0.001000
+    )
+    model = load_model(model_config, optimizer_config, training_config)
     model.eval()
-    prompt_encoded = load_prompt(tokenizer)
-
+    prompt_encoded = load_prompt(tokenizer, training_config)
+    
     with torch.no_grad():
         for t in range(inference_config.max_new_tokens):
             logits = model(prompt_encoded)[:, -1, :] # Shape: (batch_size, vocab_size)
@@ -91,7 +95,6 @@ if __name__ == "__main__":
             
             next_token = torch.multinomial(probs, num_samples=1)
             prompt_encoded = torch.cat([prompt_encoded, next_token], dim=-1)
-            
             # Batchsize must be 1
             if next_token.item() == inference_config.eot_index:
                 break

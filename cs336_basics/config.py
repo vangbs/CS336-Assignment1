@@ -14,17 +14,16 @@ class ModelConfig:
 @dataclass(frozen=True)
 class OptimizerConfig:
     lr: float = 1e-4
-    max_learning_rate: float = 6e-4
-    min_learning_rate: float = 6e-5
-    warmup_iters: int = 2000
-    cosine_cycle_iters: int = 100000    
+    max_learning_rate: float = 5e-4
+    min_learning_rate: float = 5e-5
+    warmup_iters: int = 150
     weight_decay: float = 0.1
     betas: tuple[float, float] = (0.9, 0.95)
     eps: float = 1e-5
 
 @dataclass(frozen=True)
 class TrainingConfig:
-    num_iters: int = 100
+    num_iters: int = 2000
     batch_size: int = 128
     max_grad_norm: float = 1.0
     device: torch.device = torch.device('cuda')
@@ -33,8 +32,7 @@ class TrainingConfig:
 
 @dataclass(frozen=True)
 class InferenceConfig:
-    max_new_tokens: int = 100
-    temperature: float = 1
-    top_p: float = 1
+    max_new_tokens: int = 255
+    temperature: float = 0.75
+    top_p: float = 0.9
     eot_index: int = 0
-

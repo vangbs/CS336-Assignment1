@@ -167,3 +167,6 @@ data/
 
 # Lock files
 uv.lock
+
+# Checkpoints
+checkpoints/
