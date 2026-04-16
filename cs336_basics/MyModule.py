@@ -3,6 +3,8 @@ import torch
 from jaxtyping import jaxtyped, Float, Int, Bool
 from beartype import beartype
 from einops import einsum, reduce, rearrange
+from config import ModelConfig, TrainingConfig
+from dataclasses import replace
 
 class MyLinear(torch.nn.Module):
     def __init__(
@@ -360,16 +362,25 @@ class MyTransformerLM(torch.nn.Module):
 # Test
 if __name__ == "__main__":
     device = torch.device("meta")
+    model_config = ModelConfig()
+    base_train_cfg = TrainingConfig()
+    training_config = replace(
+        base_train_cfg,
+        batch_size = 64,
+        accumulation_steps = 8,
+        num_iters = 1280000 // 64 // 8
+    )
     model = MyTransformerLM(
-        vocab_size=50257,
-        context_length=1024,
-        d_model=1600,
-        num_layers=48,
-        num_heads=25,
-        d_ff=6400,
-        rope_theta=10000.0,
-        dtype=torch.bfloat16
-    ).to(device)
-    #from torchinfo import summary
-    #input_data = torch.ones((1, 1024), dtype=torch.long, device=device)
-    #summary(model, input_data=input_data)
+        vocab_size=model_config.vocab_size,
+        context_length=model_config.context_length,
+        d_model=model_config.d_model,
+        num_layers=model_config.num_layers,
+        num_heads=model_config.num_heads,
+        d_ff=model_config.d_ff,
+        rope_theta=model_config.rope_theta,
+        device=training_config.device,
+        dtype=training_config.dtype
+    )
+    from torchinfo import summary
+    input_data = torch.ones((1, 256), dtype=torch.long, device=device)
+    summary(model, input_data=input_data)

@@ -3,7 +3,7 @@ import torch
 
 @dataclass(frozen=True)
 class ModelConfig:
-    vocab_size: int = 10000
+    vocab_size: int = 32000
     context_length: int = 256
     d_model: int = 512
     num_layers: int = 4
@@ -24,15 +24,16 @@ class OptimizerConfig:
 @dataclass(frozen=True)
 class TrainingConfig:
     num_iters: int = 2000
-    batch_size: int = 128
+    batch_size: int = 64
+    accumulation_steps: int = 1
     max_grad_norm: float = 1.0
     device: torch.device = torch.device('cuda')
     dtype: torch.dtype = torch.bfloat16
-    set_name: str = 'TinyStoriesV2-GPT4'
+    set_name: str = 'owt'
 
 @dataclass(frozen=True)
 class InferenceConfig:
-    max_new_tokens: int = 255
-    temperature: float = 0.75
-    top_p: float = 0.9
+    max_new_tokens: int = 200
+    temperature: float = 0.9
+    top_p: float = 0.95
     eot_index: int = 0

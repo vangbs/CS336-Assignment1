@@ -32,8 +32,7 @@ def load_model(
         betas=optimizer_config.betas,
         eps=optimizer_config.eps,
     )
-    valid_loss = 1.320312
-    checkpoint_path = f'checkpoints/{training_config.set_name}-{training_config.batch_size}-{optimizer_config.max_learning_rate:.6f}-{valid_loss:.6f}.pt'
+    checkpoint_path = f'checkpoints/{training_config.set_name}-{training_config.batch_size * training_config.accumulation_steps}-{optimizer_config.max_learning_rate:.6f}.pt'
     MyData.load_checkpoint(
         src=checkpoint_path,
         model=model,
@@ -76,11 +75,12 @@ if __name__ == "__main__":
     optimizer_config = OptimizerConfig()
     training_config = replace(
         training_config,
-        batch_size = 32
+        batch_size = 32,
+        accumulation_steps = 4
     )
     optimizer_config = replace(
         optimizer_config,
-        max_learning_rate = 0.001000
+        max_learning_rate = 0.005000
     )
     model = load_model(model_config, optimizer_config, training_config)
     model.eval()

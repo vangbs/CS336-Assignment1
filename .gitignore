@@ -170,3 +170,6 @@ uv.lock
 
 # Checkpoints
 checkpoints/
+
+# Logs
+logs/
